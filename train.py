@@ -22,7 +22,7 @@ google_data_length = 1000
 
 class network(nn.Module):
     def __init__(self, sentence_length, embedding_dimension = 5, trained_words = True, static_words = False,
-    filter_windows=(5,4,3), feature_maps=100, dropout_rate = 0.5, l2_constraint = 3, mini_batch_size=50):
+    filter_windows=(5,4,3), feature_maps=100, dropout_rate = 0.5, l2_constraint = 3, mini_batch_size=50, num_tags = 2):
         super(network, self).__init__()
         self.feature_maps = feature_maps
         self.dropout_rate = dropout_rate
@@ -61,15 +61,19 @@ class network(nn.Module):
         for i in range(len(filter_windows)):
             self.convolution.append(nn.Conv2d(1, feature_maps, (filter_windows[i], embedding_dimension)))
         
-        print("returned")
+        self.linear = nn.Linear(feature_maps * len(filter_windows), num_tags)
 
     def forward(self, input):
         embedding = self.embedding(input)
-        convolution = []
+        linear_inp = torch.empty(self.mini_batch_size, 0)
         for i in range(len(self.filter_windows)):
-            convolution.append(F.relu(self.convolution[i](embedding.view(self.mini_batch_size, 1, self.sentence_length, self.embedding_dimension))))
+            convolution = F.relu(self.convolution[i](embedding.view(self.mini_batch_size, 1, self.sentence_length, self.embedding_dimension)))
+            maxed_out = torch.max(convolution, dim = 2)[0].view(self.mini_batch_size, self.feature_maps)
+            linear_inp = torch.cat((linear_inp, maxed_out), dim=1)
 
-        return convolution
+        #dropout = 
+        out = F.softmax(self.linear(linear_inp), dim=1)
+        return out
         
 batch_size = 10
 max_sentence_length = 20
@@ -80,6 +84,4 @@ inp = torch.LongTensor(batch_size, max_sentence_length).random_(0, google_data_l
 print(inp.shape)
 print(inp)
 out = net(inp)
-print(out[0].shape)
-print(out[1].shape)
-print(out[2].shape)
+print(out)
